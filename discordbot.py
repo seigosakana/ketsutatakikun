@@ -762,7 +762,7 @@ async def on_app_command_error(interaction: discord.Interaction, error: AppComma
     embed.add_field(name="エラー発生ユーザー名", value=interaction.user.name, inline=False)
     embed.add_field(name="エラー発生ユーザーID", value=interaction.user.id, inline=False)
     #embed.add_field(name="エラー発生コマンド", value=interaction.data, inline=False)
-   embed.add_field(name="発生エラー", value=mes, inline=False)
+    embed.add_field(name="発生エラー", value=mes, inline=False)
     m = await bot.get_channel(ch).send(embed=embed)
     message = \
         "何らかのエラーが発生しました。ごめんなさい。\n"\
