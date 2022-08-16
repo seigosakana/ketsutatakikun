@@ -76,7 +76,9 @@ class regist_OK(discord.ui.View):
 class Button_OK(discord.ui.Button):
     def __init__(self):
         super().__init__(label='はい', style=discord.ButtonStyle.red)
+    
     async def callback(self,interaction: discord.Interaction):
+        tmp_task[str(interaction.user.id)]["no"] = len(TASK_LIST) + 1
         TASK_LIST.append(tmp_task[str(interaction.user.id)])
         regist_num = tmp_task[str(interaction.user.id)]["no"]
         tmp_task.pop(str(interaction.user.id))
@@ -245,7 +247,7 @@ class hundsup(commands.Cog):
 
         class edit_status_Button(discord.ui.Button):
             async def callback(self,interaction: discord.Interaction):
-                await interaction.response.defer(thinking=True)
+                await interaction.response.defer(thinking=True,ephemeral=True)
                 view = discord.ui.View()
                 select_menu = select_status()
                 async def s_callback(interaction: discord.Interaction):
@@ -280,7 +282,7 @@ class hundsup(commands.Cog):
 
                 delete_msg = await interaction.channel.fetch_message(msg.id)
                 await delete_msg.delete()
-                tmp_msg = await interaction.followup.send(content=f'ステータスを選択してください',view=view)
+                tmp_msg = await interaction.followup.send(content=f'ステータスを選択してください',view=view,ephemeral=True)
 
         class select_status(discord.ui.Select):
             def __init__(self):
@@ -474,7 +476,7 @@ class hundsup(commands.Cog):
             
             #ﾀｽｸ内容ﾃﾞｰﾀ作成
             tmp_task[str(interaction.user.id)] = {
-                "no" : len(TASK_LIST) + len(tmp_task) + 1,
+                "no" : 0,
                 "title" : title,
                 "detail" : detail.value if detail.value != f'詳細を入力してください' else "未設定",
                 "date" : input_date,
@@ -494,6 +496,16 @@ class hundsup(commands.Cog):
             try:
                 await interaction.delete_original_message()
                 tmp_task.pop(str(interaction.user.id))
+                await interaction.followup.send(content=f'タスクの登録をキャンセルしました')
+            except:
+                pass
+            return
+
+        if str(interaction.user.id) in tmp_task:
+            await interaction.response.send_message(content=f'あなたが登録中のタスクがあります\nそちらの処理を先に行ってください')
+            await asyncio.sleep(10)
+            try:
+                await interaction.delete_original_message()
                 await interaction.followup.send(content=f'タスクの登録をキャンセルしました')
             except:
                 pass
@@ -521,7 +533,8 @@ class hundsup(commands.Cog):
         await interaction.response.defer(thinking=True)
         task_title = ""
         cmp_title = ""
-        count = 0
+        main_count = 0
+        cmp_count = 0
         embed = discord.Embed(color=0xee1111)
         cmp_embed = discord.Embed(color=0xee1111)
         if len(TASK_LIST) == 0:
@@ -529,22 +542,35 @@ class hundsup(commands.Cog):
         else:
             tmp_task_list = sorted(TASK_LIST, key=lambda x: x['date'])
             for i in tmp_task_list:
-                count += 1
                 if i["status"] == "完了":
                     if i["task_conect"] != "child":
+                        cmp_count += 1
                         cmp_title = f'`{i["no"]}.` **{str(i["title"])}** (`期限 :` {i["date"]}) `担当者 :` <@{i["user"]}>\n'
                         if i["task_conect"] == "parent":
                             cmp_title += "> |- 子タスク有り\n"
+                        if cmp_count % 10 == 0:
+                            cmp_embed.add_field(name=f'__***完了タスク一覧(page:{cmp_count//10})***__',value=cmp_title,inline=False)
+                            cmp_title = ""
                 elif i["task_conect"] != "child":
+                    main_count += 1
                     task_title += f'`{i["no"]}.` **{str(i["title"])}** (`期限 :` {i["date"]}) `担当者 :` <@{i["user"]}>\n'
                     if i["task_conect"] == "parent":
-                        task_title += "> |- 子タスク有り\n"
-        embed.add_field(name="__***タスク一覧***__",value=task_title)
-        cmp_embed.add_field(name="__***完了タスク一覧***__",value=cmp_title)
-        embed_list = []
+                        #子タスク進捗計算
+                        complete = 0
+                        for j in i["conect_no"]:
+                            complete += 1 if TASK_LIST[j]["status"] == "完了" else 0
+                        task_title += f'> |-> 子タスク有り (進捗: `{(complete//len(i["conect_no"]))*100}%`)\n'
+                if main_count % 10 == 0:
+                    embed.add_field(name=f'__***タスク一覧(page:{main_count//10})***__',value=task_title,inline=False)
+                    task_title = ""
         if task_title != "":
-            embed_list.append(embed)
+            embed.add_field(name=f'__***タスク一覧(page:{(main_count//10)+1})***__',value=task_title,inline=False)
         if cmp_title != "":
+            cmp_embed.add_field(name=f'__***完了タスク一覧(page:{(cmp_count//10)+1})***__',value=cmp_title)
+        embed_list = []
+        if main_count != 0:
+            embed_list.append(embed)
+        if cmp_count != 0:
             embed_list.append(cmp_embed)
         await interaction.followup.send(embeds=embed_list)
 
@@ -736,11 +762,11 @@ async def on_app_command_error(interaction: discord.Interaction, error: AppComma
     embed.add_field(name="エラー発生ユーザー名", value=interaction.user.name, inline=False)
     embed.add_field(name="エラー発生ユーザーID", value=interaction.user.id, inline=False)
     #embed.add_field(name="エラー発生コマンド", value=interaction.data, inline=False)
-    embed.add_field(name="発生エラー", value=mes, inline=False)
+   embed.add_field(name="発生エラー", value=mes, inline=False)
     m = await bot.get_channel(ch).send(embed=embed)
     message = \
         "何らかのエラーが発生しました。ごめんなさい。\n"\
-        +f"このエラーについて問い合わせるときはこのコードも一緒にお知らせください：{id}"
+        +f"このエラーについて問い合わせるときはこのコードも一緒にお知らせください：{m.id}"
     embed=discord.Embed(title="__***連絡先***__",color=0xffffff)
     embed.add_field(name="twitter", value="[@enoooooooon](https://twitter.com/enoooooooon)", inline=True)
     embed.add_field(name="discord", value="non#0831", inline=True)
