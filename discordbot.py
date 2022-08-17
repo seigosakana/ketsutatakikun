@@ -247,7 +247,7 @@ class hundsup(commands.Cog):
 
         class edit_status_Button(discord.ui.Button):
             async def callback(self,interaction: discord.Interaction):
-                await interaction.response.defer(thinking=True,ephemeral=True)
+                await interaction.response.defer(thinking=True)
                 view = discord.ui.View()
                 select_menu = select_status()
                 async def s_callback(interaction: discord.Interaction):
@@ -282,7 +282,7 @@ class hundsup(commands.Cog):
 
                 delete_msg = await interaction.channel.fetch_message(msg.id)
                 await delete_msg.delete()
-                tmp_msg = await interaction.followup.send(content=f'ステータスを選択してください',view=view,ephemeral=True)
+                tmp_msg = await interaction.followup.send(content=f'ステータスを選択してください',view=view)
 
         class select_status(discord.ui.Select):
             def __init__(self):
@@ -558,9 +558,9 @@ class hundsup(commands.Cog):
                         #子タスク進捗計算
                         complete = 0
                         for j in i["conect_no"]:
-                            complete += 1 if TASK_LIST[j]["status"] == "完了" else 0
+                            complete += 1 if TASK_LIST[j-1]["status"] == "完了" else 0
                         task_title += f'> |-> 子タスク有り (進捗: `{(complete//len(i["conect_no"]))*100}%`)\n'
-                if main_count % 10 == 0:
+                if (main_count % 10 == 0) and (task_title != ""):
                     embed.add_field(name=f'__***タスク一覧(page:{main_count//10})***__',value=task_title,inline=False)
                     task_title = ""
         if task_title != "":
